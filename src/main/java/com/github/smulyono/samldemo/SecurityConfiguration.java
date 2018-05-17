@@ -1,18 +1,20 @@
 package com.github.smulyono.samldemo;
 
-import org.opensaml.saml2.metadata.provider.MetadataProviderException;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.saml.SAMLAuthenticationProvider;
-import org.springframework.security.saml.log.SAMLDefaultLogger;
-import org.springframework.security.saml.metadata.MetadataManager;
-import org.springframework.security.saml.websso.*;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.saml.SAMLCredential;
+import org.springframework.security.saml.userdetails.SAMLUserDetailsService;
+
+import java.util.ArrayList;
 
 import static org.springframework.security.extensions.saml2.config.SAMLConfigurer.saml;
 
@@ -43,11 +45,9 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .permitAll()
                 .anyRequest().authenticated()
                 .and()
-            .logout()
-                .logoutUrl("/saml/logout?local=true")
-                .logoutSuccessUrl("/")
-                .and()
             .apply(saml())
+                .forcePrincipalAsString()
+                .userDetailsService(new SimpleSamlUserDetailsService())
                 .serviceProvider()
                     .keyStore()
                     .storeFilePath(this.keyStoreFilePath)
@@ -62,44 +62,17 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
             .identityProvider()
             .metadataFilePath(this.metadataUrl);
     }
+}
 
-//    @Bean
-//    public SAMLAuthenticationProvider samlAuthenticationProvider() {
-//        SAMLAuthenticationProvider newConfig = new SAMLAuthenticationProvider();
-//        newConfig.setForcePrincipalAsString(true);
-//        return newConfig;
-//    }
-//    // -- ALL bean dependency which is needed by qualifier type !!! --//
-//    // SAML 2.0 Web SSO profile
-//    @Bean
-//    public WebSSOProfile webSSOprofile() {
-//        return new WebSSOProfileImpl();
-//    }
-//    // SAML 2.0 WebSSO Assertion Consumer
-//    @Bean
-//    public WebSSOProfileConsumer webSSOprofileConsumer() {
-//        return new WebSSOProfileConsumerImpl();
-//    }
-//    // SAML 2.0 Holder-of-Key WebSSO Assertion Consumer
-//    @Bean
-//    public WebSSOProfileConsumerHoKImpl hokWebSSOprofileConsumer() {
-//        return new WebSSOProfileConsumerHoKImpl();
-//    }
-//    // SAML 2.0 Holder-of-Key Web SSO profile
-//    @Bean
-//    public WebSSOProfileConsumerHoKImpl hokWebSSOProfile() {
-//        return new WebSSOProfileConsumerHoKImpl();
-//    }
-//    // Logger for SAML messages and events
-//    @Bean
-//    public SAMLDefaultLogger samlLogger() {
-//        return new SAMLDefaultLogger();
-//    }
-//    // SAML 2.0 ECP profile
-//    @Bean
-//    public WebSSOProfileECPImpl ecpprofile() {
-//        return new WebSSOProfileECPImpl();
-//    }
+@Slf4j
+class SimpleSamlUserDetailsService implements SAMLUserDetailsService {
+
+    @Override
+    public Object loadUserBySAML(SAMLCredential samlCredential) throws UsernameNotFoundException {
+        String username = samlCredential.getNameID().getValue();
+        log.info("Getting user logged in with {} ", username);
+        return new User(username, "dummy", new ArrayList<GrantedAuthority>());
+    }
 }
 
 

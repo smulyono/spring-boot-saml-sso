@@ -7,6 +7,7 @@
     <span>Logged in!</span>
     <span th:text="${username}">test</span>
     <hr />
-    <a href="/logout">LOGOUT</a>
+    <a th:href="@{/saml/logout}">LOGOUT</a>
+    <a th:href="@{/saml/logout?local=true}">LOGOUT</a>
 </body>
 </html>
