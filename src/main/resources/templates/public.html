@@ -4,6 +4,16 @@
     <title>Public Page</title>
 </head>
 <body>
-Not Logged in <a href="/private">login</a>
+
+<p th:if="${loginError}" class="error">Wrong user or password</p>
+<form th:action="@{/j_spring_security_check}" method="post">
+    <label for="username">Username</label>:
+    <input type="text" id="username" name="username" autofocus="autofocus" /> <br />
+    <label for="password">Password</label>:
+    <input type="password" id="password" name="password" /> <br />
+    <input type="submit" value="Log in" />
+</form>
+
+<a href="saml/login">SSO-Login</a>
 </body>
 </html>

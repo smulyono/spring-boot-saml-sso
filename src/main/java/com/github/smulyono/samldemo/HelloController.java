@@ -17,6 +17,6 @@ public class HelloController {
     @RequestMapping("/private")
     public String index(Model model,Principal user) {
         model.addAttribute("username",user.getName());
-        return "index";
+        return "private";
     }
 }
