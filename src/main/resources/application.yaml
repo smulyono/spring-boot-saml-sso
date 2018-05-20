@@ -13,3 +13,5 @@ server:
 security:
   saml2:
     metadata-url: <metadata-url>
+    user:
+      blocked: <empty user>

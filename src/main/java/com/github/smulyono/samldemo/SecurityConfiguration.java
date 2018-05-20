@@ -1,45 +1,38 @@
 package com.github.smulyono.samldemo;
 
-import lombok.extern.log4j.Log4j;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.PriorityOrdered;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.saml.SAMLAuthenticationProvider;
 import org.springframework.security.saml.SAMLCredential;
 import org.springframework.security.saml.userdetails.SAMLUserDetailsService;
-import org.springframework.security.web.FilterChainProxy;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-import javax.servlet.Filter;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
-import static org.springframework.security.extensions.saml2.config.SAMLConfigurer.saml;
+//import static org.springframework.security.extensions.saml2.config.SAMLConfigurer.saml;
+
+import static com.github.smulyono.samldemo.configurer.SAMLConfigurer.saml;
+
 
 @EnableWebSecurity
 @Configuration
@@ -60,6 +53,8 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
     @Value("${server.ssl.key-store}")
     String keyStoreFilePath;
 
+    @Autowired SimpleSamlUserDetailsService simpleSamlUserDetailsService;
+
     @Override
     protected void configure(final HttpSecurity http) throws Exception {
         http
@@ -79,7 +74,8 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .loginProcessingUrl("/j_spring_security_check")
                 .usernameParameter("username")
                 .passwordParameter("password")
-                .successHandler(new customAuthSuccessHandler())
+                .successHandler(successHandler())
+                .failureHandler(failureHandler())
                 .permitAll()
             .and()
                 .logout()
@@ -87,7 +83,9 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
             .and()
             .apply(saml())
                 .forcePrincipalAsString()
-                .userDetailsService(new SimpleSamlUserDetailsService())
+                .userDetailsService(simpleSamlUserDetailsService)
+                .successHandler(successHandler())
+                .failureHandler(failureHandler())
                 .serviceProvider()
                     .keyStore()
                     .storeFilePath(this.keyStoreFilePath)
@@ -118,21 +116,36 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
         csrf.setCookieName("test-csrf");
         return csrf;
     }
+
+    @Bean
+    public AuthenticationSuccessHandler successHandler() {
+        return new customAuthSuccessHandler();
+    }
+
+    @Bean
+    public AuthenticationFailureHandler failureHandler() {
+        return new customAuthFailureHandler();
+    }
 }
 
 @Slf4j
+@Component
 class SimpleSamlUserDetailsService implements SAMLUserDetailsService {
+    @Value("${security.saml2.user.blocked:''}")
+    String blockedUser;
+
 
     @Override
     public Object loadUserBySAML(SAMLCredential samlCredential) throws UsernameNotFoundException {
         String username = samlCredential.getNameID().getValue();
-        if (username.equalsIgnoreCase("smulyono+1@ciphercloud.com")) {
-            log.info("Getting user logged in with {} ", username);
-            return new User(username, "dummy", Arrays.asList(new SimpleGrantedAuthority("ADMIN")));
-        } else {
+        log.info("Testing blocked user {}", blockedUser);
+        if (!username.isEmpty() && username.equalsIgnoreCase(blockedUser)) {
             // Will get redirected to 401 error page
             log.info("SHOULD NOT LOGGED IN with {} ", username);
             throw new UsernameNotFoundException("NOT VALID LOGIN!");
+        } else {
+            log.info("Getting user logged in with {} ", username);
+            return new User(username, "dummy", Arrays.asList(new SimpleGrantedAuthority("ADMIN")));
         }
     }
 }
@@ -149,32 +162,12 @@ class customAuthSuccessHandler extends
 }
 
 @Slf4j
-@Service
-class DefaultRolesPrefixPostProcessor implements BeanPostProcessor, PriorityOrdered {
-
+class customAuthFailureHandler extends
+        SavedRequestAwareAuthenticationSuccessHandler implements
+        AuthenticationFailureHandler {
     @Override
-    public Object postProcessBeforeInitialization(Object o, String s) throws BeansException {
-        return o;
-    }
-
-    @Override
-    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-        if (bean instanceof FilterChainProxy) {
-
-            FilterChainProxy chains = (FilterChainProxy) bean;
-
-            for (SecurityFilterChain chain : chains.getFilterChains()) {
-                for (Filter filter : chain.getFilters()) {
-                    log.info("Filter registered {}", filter.getClass().toGenericString());
-                }
-            }
-        }
-        return bean;
-    }
-
-    @Override
-    public int getOrder() {
-        return 0;
+    public void onAuthenticationFailure(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, AuthenticationException e) throws IOException, ServletException {
+        log.info("BAD Authentications!!!");
+        httpServletResponse.sendRedirect("/public?error=bad_auth");
     }
 }
-
