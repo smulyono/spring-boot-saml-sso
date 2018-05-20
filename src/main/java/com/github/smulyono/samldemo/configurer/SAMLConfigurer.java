@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.regex.Pattern;
 
+import com.github.smulyono.samldemo.metadata.CachingMetadataChangeEvent;
 import org.apache.commons.httpclient.HttpClient;
 import org.opensaml.Configuration;
 import org.opensaml.PaosBootstrap;
@@ -26,6 +27,8 @@ import org.opensaml.xml.security.keyinfo.NamedKeyInfoGeneratorManager;
 import org.opensaml.xml.security.x509.CertPathPKIXTrustEvaluator;
 import org.opensaml.xml.security.x509.PKIXTrustEvaluator;
 import org.opensaml.xml.security.x509.X509KeyInfoGeneratorFactory;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -110,6 +113,7 @@ public class SAMLConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFil
     // Custom (ADD)
     private AuthenticationSuccessHandler samlAuthenticationSuccessHandler;
     private AuthenticationFailureHandler samlAuthenticationFailureHandler;
+    private ApplicationEventPublisher applicationEventPublisher;
     // -- end of custom--
     private boolean forcePrincipalAsString = false;
 
@@ -204,6 +208,11 @@ public class SAMLConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFil
         return this;
     }
 
+    public SAMLConfigurer eventPublisher(ApplicationEventPublisher publisher) {
+        this.applicationEventPublisher = publisher;
+        return this;
+    }
+
 
     private String entityBaseURL() {
         String entityBaseURL = serviceProvider.hostName + "/" + serviceProvider.basePath;
@@ -274,6 +283,10 @@ public class SAMLConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFil
         }
 
         cachingMetadataManager.setKeyManager(serviceProvider.keyManager);
+        // publish event for caching metadata manager
+        if (applicationEventPublisher != null) {
+            applicationEventPublisher.publishEvent(new CachingMetadataChangeEvent(cachingMetadataManager));
+        }
         return cachingMetadataManager;
     }
 

@@ -3,6 +3,7 @@ package com.github.smulyono.samldemo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -54,6 +55,8 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
     String keyStoreFilePath;
 
     @Autowired SimpleSamlUserDetailsService simpleSamlUserDetailsService;
+    @Autowired
+    ApplicationEventPublisher publisher;
 
     @Override
     protected void configure(final HttpSecurity http) throws Exception {
@@ -86,6 +89,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .userDetailsService(simpleSamlUserDetailsService)
                 .successHandler(successHandler())
                 .failureHandler(failureHandler())
+                .eventPublisher(publisher)
                 .serviceProvider()
                     .keyStore()
                     .storeFilePath(this.keyStoreFilePath)
